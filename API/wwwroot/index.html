@@ -1,0 +1,93 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SignalR Private Chat</title>
+    <style>
+        .container {
+            background-color: #99CCFF;
+            border: thick solid #808080;
+            padding: 20px;
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <input type="text" id="receiverId" placeholder="Receiver ID" />
+        <input type="text" id="message" placeholder="Enter message" />
+        <input type="button" id="sendmessage" value="Send" />
+        <ul id="discussion"></ul>
+    </div>
+
+    <!-- SignalR JavaScript Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/5.0.11/signalr.min.js"></script>
+
+    <!-- Add script to update the page and send messages -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+
+            var receiverIdInput = document.getElementById('receiverId');
+            var messageInput = document.getElementById('message');
+
+            // Get the user's name and store it to prepend to messages.
+            var receiverId = prompt('Enter your user ID (Sender):', '');
+
+            // Set initial focus to message input box.
+            receiverIdInput.focus();
+
+            // Start the connection to the hub.
+            var connection = new signalR.HubConnectionBuilder()
+                .withUrl('/chathub', { queryParams: { receiverId: receiverId } }) // Attach senderId as query parameter
+                .build();
+            console.log(receiverId);
+
+            // Create a function that the hub can call to broadcast messages.
+            connection.on('ReceiveMessage', function (senderId, receiverId, message) {
+                // Html encode display name and message.
+                var encodedSenderId = senderId;
+                var encodedMsg = message;
+                // Add the message to the page.
+                var liElement = document.createElement('li');
+                liElement.innerHTML = '<strong>' + encodedSenderId + '</strong>:&nbsp;&nbsp;' + encodedMsg;
+                document.getElementById('discussion').appendChild(liElement);
+            });
+
+            // Handle errors
+            connection.on('Error', function (errorMessage) {
+                console.error('Error: ' + errorMessage);
+            });
+
+            // Start the SignalR connection
+            connection.start()
+                .then(function () {
+                    console.log('Connection started');
+                    document.getElementById('sendmessage').addEventListener('click', function (event) {
+                        // Call the SendMessage method on the hub.
+                        var receiverId = receiverIdInput.value;
+                        var message = messageInput.value;
+
+                        if (!receiverId || !message) {
+                            alert("Receiver ID and message are required.");
+                            return;
+                        }
+
+                        connection.invoke('SendMessage', receiverId, message)
+                            .catch(function (err) {
+                                console.error(err.toString());
+                            });
+
+                        // Clear the text box and reset focus for next message.
+                        messageInput.value = '';
+                        messageInput.focus();
+                        event.preventDefault();
+                    });
+                })
+                .catch(function (err) {
+                    console.error(err.toString());
+                });
+        });
+    </script>
+</body>
+</html>
